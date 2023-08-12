@@ -163,6 +163,11 @@ socket.addEventListener('open', (event) => {
     // }
 });
 
+socket.addEventListener('close', (event) => {
+  console.log('Disconnected to the server.')
+  removeUserCube(myCubeId)
+});
+
 // Handle cube creation for new users
 const createUserCube = ({clientId, color}) => {
   console.log("생성 색깔:", color)
