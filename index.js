@@ -14,8 +14,8 @@ const cubes = {}; // Object to store cubes by user ID
 camera.position.z = 5;
 
 // WebSocket setup
-const socket = new WebSocket('wss://695a-1-237-38-86.ngrok-free.app');
-alert(socket)
+const socket = new WebSocket('wss://cf9e-1-237-38-86.ngrok-free.app');
+
 let myCubeId
 let myColor
 // let clientId, x, y, z, color
@@ -44,7 +44,8 @@ const handleMovement = (event) => {
         z: cubes[myCubeId].position.z,
         color: myColor
     };
-    socket.send(JSON.stringify(positionData));
+    console.log("Client 전송: ", positionData)
+    socket.send(JSON.stringify({type: "userInfo", ...positionData}))
 };
 
 
@@ -56,7 +57,6 @@ window.addEventListener('resize', () => {
   camera.aspect = newWidth / newHeight;
   camera.updateProjectionMatrix();  
   renderer.setSize(newWidth, newHeight);  
-  console.log(userListContainer.style)
 });
 
 
@@ -82,6 +82,16 @@ const moveCube = () => {
 
   cubes[myCubeId].position.x = THREE.MathUtils.clamp(cubes[myCubeId].position.x, minX, maxX);
   cubes[myCubeId].position.z = THREE.MathUtils.clamp(cubes[myCubeId].position.z, minZ, maxZ);
+
+  // Send updated position to the server
+  const positionData = {
+    clientId: myCubeId,        
+    x: cubes[myCubeId].position.x,
+    y: cubes[myCubeId].position.y,
+    z: cubes[myCubeId].position.z,
+    color: myColor
+  }  
+  socket.send(JSON.stringify({type: "userInfo", ...positionData}))
 };
 
 
@@ -104,39 +114,47 @@ animate();
 
 
 // Listen for position updates from the server
-socket.addEventListener('message', (event) => {
-    console.log(event.data)
-    const data = JSON.parse(event.data);
-    let userInfo = data.userInfo
-
-    let clientId, x, y, z, color
-    if (typeof userInfo === "string") {
-      userInfo = JSON.parse(userInfo)
-    }
-    clientId = userInfo.clientId
-    x = userInfo.x
-    y = userInfo.y
-    z = userInfo.z
-    color = userInfo.color  
+socket.addEventListener('message', (event) => {    
+    
+  const data = JSON.parse(event.data)  
+  if (data.type === "userInfo") {
+    let {clientId, x, y, z, color} = data    
 
     if (!cubes[clientId]) {
       console.log("New cube generated!", clientId)
       if (Object.keys(cubes).length === 0) {
         myCubeId = clientId
-        myColor = color       
+        myColor = color
       }
       createUserCube({clientId, color })
-    }    
+    }
     const cube = cubes[clientId];    
     cube.position.x = x || 0;
     cube.position.y = y || 0;
     cube.position.z = z || 0;
+  } else if (data.type === "userListInfo") {
+    let {userListInfo} = data
+    let userArr = Object.keys(userListInfo)
+
+    for (let i = 0; i < userArr.length; i++) {      
+      let {clientId, x, y, z, color} = userListInfo[userArr[i]]
+      if (clientId === myCubeId) return
+      createUserCube({clientId, color })      
+      const cube = cubes[clientId]
+      cube.position.x = x || 0;
+      cube.position.y = y || 0;
+      cube.position.z = z || 0;
+    }
+  } else if (data.type === "DISCONNECT") {
+    removeUserCube(data.clientId)    
+  }
+    
 });
 
 // Inform the server that a new user has joined and create the user's cube
 socket.addEventListener('open', (event) => {
-    alert('Connected to the server.');
-    console.log(socket.userInfo)
+    console.log('Connected to the server.');
+    // console.log(socket, event)
     // Create the cube for the user
     // if (socket.userInfo !== undefined) {      
       // createUserCube(socket.userInfo)
@@ -155,10 +173,17 @@ const createUserCube = ({clientId, color}) => {
   scene.add(cube);
   cubes[clientId] = cube; // Store the cube in the object
   const li = document.createElement('li');
+  li.id = clientId
   li.textContent = clientId;
-  userList.appendChild(li);  
+  userList.appendChild(li);
 };
 
+const removeUserCube = (clientId) => {
+  scene.remove(cubes[clientId])
+  delete cubes[clientId]
+  document.getElementById(clientId).remove()
+  console.log(clientId, cubes)
+}
 
 // Handle touch controls
 const stick = document.getElementById('stick');
