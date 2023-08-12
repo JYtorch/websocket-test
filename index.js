@@ -14,7 +14,7 @@ const cubes = {}; // Object to store cubes by user ID
 camera.position.z = 5;
 
 // WebSocket setup
-const socket = new WebSocket('ws://695a-1-237-38-86.ngrok-free.app');
+const socket = new WebSocket('wss://695a-1-237-38-86.ngrok-free.app');
 alert(socket)
 let myCubeId
 let myColor
